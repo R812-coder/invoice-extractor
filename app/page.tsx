@@ -312,6 +312,12 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+  <p className="text-sm text-yellow-800">
+    <strong>⚠️ Beta Version:</strong> This tool is in active development. 
+    Expect some rough edges. Your feedback directly shapes what gets built next.
+  </p>
+</div>
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Invoice Data Extractor
@@ -938,3 +944,4 @@ export default function Home() {
     </div>
   );
 }
+
