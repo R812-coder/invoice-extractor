@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import React from "react";
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]); 
@@ -10,6 +11,8 @@ export default function Home() {
   const [processingStatus, setProcessingStatus] = useState<string>(""); 
   const [extractedInvoices, setExtractedInvoices] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
+
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -229,6 +232,82 @@ export default function Home() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const updateInvoice = (index: number, field: string, value: any) => {
+    const updated = [...extractedInvoices];
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    };
+    setExtractedInvoices(updated);
+  };
+  
+  const updateLineItem = (invoiceIndex: number, itemIndex: number, field: string, value: any) => {
+    const updated = [...extractedInvoices];
+    const updatedLineItems = [...updated[invoiceIndex].line_items];
+    
+    // Update the field
+    updatedLineItems[itemIndex] = {
+      ...updatedLineItems[itemIndex],
+      [field]: value,
+    };
+    
+    // Auto-calculate line total if quantity or unit_price changed
+    if (field === 'quantity' || field === 'unit_price') {
+      const qty = field === 'quantity' ? value : updatedLineItems[itemIndex].quantity;
+      const price = field === 'unit_price' ? value : updatedLineItems[itemIndex].unit_price;
+      updatedLineItems[itemIndex].line_total = (qty || 0) * (price || 0);
+    }
+    
+    updated[invoiceIndex].line_items = updatedLineItems;
+    
+    // Recalculate invoice totals
+    const subtotal = updatedLineItems.reduce((sum: number, item: any) => sum + (item.line_total || 0), 0);    updated[invoiceIndex].subtotal = subtotal;
+    updated[invoiceIndex].total_amount = subtotal + (updated[invoiceIndex].tax_amount || 0);
+    
+    setExtractedInvoices(updated);
+  };
+  
+  const addLineItem = (invoiceIndex: number) => {
+    const updated = [...extractedInvoices];
+    const newItem = {
+      description: "New Item",
+      quantity: 1,
+      unit_price: 0,
+      line_total: 0,
+    };
+    updated[invoiceIndex].line_items = [
+      ...(updated[invoiceIndex].line_items || []),
+      newItem,
+    ];
+    
+    // Recalculate totals
+    const subtotal = updated[invoiceIndex].line_items.reduce(
+      (sum: number, item: any) => sum + (item.line_total || 0), 
+      0
+    );
+    updated[invoiceIndex].subtotal = subtotal;
+    updated[invoiceIndex].total_amount = subtotal + (updated[invoiceIndex].tax_amount || 0);
+    
+    setExtractedInvoices(updated);
+  };
+  
+  const deleteLineItem = (invoiceIndex: number, itemIndex: number) => {
+    const updated = [...extractedInvoices];
+    updated[invoiceIndex].line_items = updated[invoiceIndex].line_items.filter(
+      (_: any, idx: number) => idx !== itemIndex
+    );
+    
+    // Recalculate totals after deletion
+    const subtotal = updated[invoiceIndex].line_items.reduce(
+      (sum: number, item: any) => sum + (item.line_total || 0), 
+      0
+    );
+    updated[invoiceIndex].subtotal = subtotal;
+    updated[invoiceIndex].total_amount = subtotal + (updated[invoiceIndex].tax_amount || 0);
+    
+    setExtractedInvoices(updated);
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-2xl mx-auto">
@@ -352,7 +431,8 @@ export default function Home() {
         )}
       </div>
 
-     {/* Results Section */}
+     
+{/* Results Section */}
 {extractedInvoices.length > 0 && (
   <div className="max-w-6xl mx-auto mt-8">
     <div className="bg-white rounded-lg shadow-lg p-8">
@@ -365,7 +445,7 @@ export default function Home() {
           onClick={() => {
             setExtractedInvoices([]);
             setFiles([]);
-            setIsEditing(false);
+            setExpandedRow(null);
           }}
           className="text-sm text-gray-600 hover:text-gray-800"
         >
@@ -385,32 +465,386 @@ export default function Home() {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {extractedInvoices.map((invoice, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">{idx + 1}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {invoice.vendor_name || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {invoice.invoice_number || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {invoice.invoice_date || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {invoice.due_date || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                  ${invoice.total_amount?.toFixed(2) || '0.00'}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {invoice.line_items?.length || 0} item(s)
-                </td>
-              </tr>
-            ))}
+          {extractedInvoices.map((invoice, idx) => (
+  <React.Fragment key={idx}>
+    {/* Main Row */}
+    <tr
+                  className={`hover:bg-gray-50 cursor-pointer ${
+                    expandedRow === idx ? "bg-blue-50" : ""
+                  }`}
+                  onClick={() => setExpandedRow(expandedRow === idx ? null : idx)}
+                >
+                  <td className="px-4 py-3 text-sm text-gray-900">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {invoice.vendor_name || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {invoice.invoice_number || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {invoice.invoice_date || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {invoice.due_date || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    ${invoice.total_amount?.toFixed(2) || "0.00"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {invoice.line_items?.length || 0} item(s)
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedRow(expandedRow === idx ? null : idx);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {expandedRow === idx ? "Close ▲" : "Edit ▼"}
+                    </button>
+                  </td>
+                </tr>
+
+                {/* Expanded Details Row */}
+                {expandedRow === idx && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-6 bg-gray-50">
+                      <div className="space-y-6">
+                        {/* Vendor Information */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Vendor Information
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Vendor Name
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.vendor_name || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "vendor_name", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Email
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.vendor_email || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "vendor_email", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Address
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.vendor_address || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "vendor_address", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Phone
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.vendor_phone || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "vendor_phone", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Invoice Details */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Invoice Details
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Invoice Number
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.invoice_number || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "invoice_number", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                PO Number
+                              </label>
+                              <input
+                                type="text"
+                                value={invoice.purchase_order_number || ""}
+                                onChange={(e) =>
+                                  updateInvoice(
+                                    idx,
+                                    "purchase_order_number",
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Invoice Date
+                              </label>
+                              <input
+                                type="date"
+                                value={invoice.invoice_date || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "invoice_date", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Due Date
+                              </label>
+                              <input
+                                type="date"
+                                value={invoice.due_date || ""}
+                                onChange={(e) =>
+                                  updateInvoice(idx, "due_date", e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Line Items */}
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700">
+                              Line Items
+                            </h4>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addLineItem(idx);
+                              }}
+                              className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                            >
+                              + Add Item
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {invoice.line_items &&
+                              invoice.line_items.map((item: any, itemIdx: number) => (
+                                <div
+                                  key={itemIdx}
+                                  className="grid grid-cols-12 gap-2 items-end bg-white p-3 rounded border"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="col-span-5">
+                                    <label className="block text-xs text-gray-600 mb-1">
+                                      Description
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={item.description || ""}
+                                      onChange={(e) =>
+                                        updateLineItem(
+                                          idx,
+                                          itemIdx,
+                                          "description",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="block text-xs text-gray-600 mb-1">
+                                      Qty
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={item.quantity || 0}
+                                      onChange={(e) =>
+                                        updateLineItem(
+                                          idx,
+                                          itemIdx,
+                                          "quantity",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="block text-xs text-gray-600 mb-1">
+                                      Unit Price
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={item.unit_price || 0}
+                                      onChange={(e) =>
+                                        updateLineItem(
+                                          idx,
+                                          itemIdx,
+                                          "unit_price",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="block text-xs text-gray-600 mb-1">
+                                      Total
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={item.line_total || 0}
+                                      onChange={(e) =>
+                                        updateLineItem(
+                                          idx,
+                                          itemIdx,
+                                          "line_total",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-1">
+                                    <button
+                                      onClick={() => deleteLineItem(idx, itemIdx)}
+                                      className="text-red-600 hover:text-red-800 text-xs"
+                                      title="Delete item"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        {/* Amounts */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Amounts
+                          </h4>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Subtotal
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={invoice.subtotal || 0}
+                                onChange={(e) =>
+                                  updateInvoice(
+                                    idx,
+                                    "subtotal",
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Tax
+                              </label>
+                              <input
+  type="number"
+  step="0.01"
+  value={invoice.tax_amount || 0}
+  onChange={(e) => {
+    const newTax = parseFloat(e.target.value) || 0;
+    const updated = [...extractedInvoices];
+    updated[idx].tax_amount = newTax;
+    updated[idx].total_amount = (updated[idx].subtotal || 0) + newTax;
+    setExtractedInvoices(updated);
+  }}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+  onClick={(e) => e.stopPropagation()}
+/>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Total
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={invoice.total_amount || 0}
+                                onChange={(e) =>
+                                  updateInvoice(
+                                    idx,
+                                    "total_amount",
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRow(null);
+                            }}
+                            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium"
+                          >
+                            ✓ Save Changes
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  )}
+                  </React.Fragment>
+                ))}
           </tbody>
         </table>
       </div>
@@ -420,18 +854,26 @@ export default function Home() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900">{extractedInvoices.length}</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {extractedInvoices.length}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-2xl font-bold text-gray-900">
-              ${extractedInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0).toFixed(2)}
+              $
+              {extractedInvoices
+                .reduce((sum, inv) => sum + (inv.total_amount || 0), 0)
+                .toFixed(2)}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Line Items</p>
             <p className="text-2xl font-bold text-gray-900">
-              {extractedInvoices.reduce((sum, inv) => sum + (inv.line_items?.length || 0), 0)}
+              {extractedInvoices.reduce(
+                (sum, inv) => sum + (inv.line_items?.length || 0),
+                0
+              )}
             </p>
           </div>
         </div>
