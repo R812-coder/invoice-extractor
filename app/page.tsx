@@ -26,8 +26,8 @@ export default function Home() {
 
   const validateFiles = (fileList: File[]): string | null => {
     // Check file count (max 20 files)
-    if (fileList.length > 20) {
-      return "Maximum 20 invoices at a time";
+    if (fileList.length > 50) {
+      return "Maximum 50 invoices at a time";
     }
   
     if (fileList.length === 0) {
@@ -385,7 +385,7 @@ export default function Home() {
   or click to browse (select multiple files)
 </p>
 <p className="text-xs text-gray-500">
-  Up to 20 invoices, PDF only, max 10MB each
+  Up to 50 invoices, PDF only, max 10MB each
 </p>
                 </div>
               )}
@@ -889,6 +889,19 @@ export default function Home() {
     </div>
   </div>
 )}
+
+{/* Roadmap Teaser */}
+<div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+  <p className="text-sm font-medium text-gray-900 mb-2">
+    🚀 Coming Soon (based on your feedback):
+  </p>
+  <ul className="text-sm text-gray-700 space-y-1">
+    <li>• Email forwarding (forward invoices, get CSV back)</li>
+    <li>• Direct QuickBooks/Xero sync (no CSV import)</li>
+    <li>• Invoice history & search</li>
+    <li>• Image & email text support</li>
+  </ul>
+</div>
     </div>
   );
 }
