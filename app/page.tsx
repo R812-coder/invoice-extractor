@@ -886,6 +886,39 @@ export default function Home() {
       >
         📥 Download Complete CSV ({extractedInvoices.length} invoices)
       </button>
+      <div id="feedback-section" className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg">
+        <div className="flex items-start space-x-4">
+          <div className="text-4xl">💬</div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              You&apos;re an Early Tester! Help Shape This Tool 🚀
+            </h3>
+            <p className="text-gray-700 mb-4">
+              Your feedback directly determines what features get built next. 
+              <span className="font-semibold"> 2-minute survey = huge impact.</span>
+            </p>
+            <div className="flex space-x-3">
+              
+                <a href="https://forms.gle/z2W8khsBC4hWbkrU6"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Give Feedback (2 min) &rarr;
+              </a>
+              <button
+                onClick={() => {
+                  const section = document.getElementById('feedback-section');
+                  if (section) section.style.display = 'none';
+                }}
+                className="text-gray-600 hover:text-gray-800 text-sm"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 )}
